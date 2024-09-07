@@ -1,0 +1,27 @@
+version: '3'
+services:
+  parser:
+    build: .
+    container_name: phishing_parser
+    volumes:
+      - ./db:/app/db
+    environment:
+      - DB_PATH=/app/db/phishing_sites.db
+      - CSV_PATH=/app/dataset/phishing_data.csv
+      - THREADS=8
+    depends_on:
+      - db
+    networks:
+      - parser_network
+
+  db:
+    image: nouchka/sqlite3
+    container_name: sqlite_db
+    volumes:
+      - ./db:/db
+    networks:
+      - parser_network
+
+networks:
+  parser_network:
+    driver: bridge
