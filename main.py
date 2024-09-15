@@ -6,51 +6,95 @@
 # --------------------------------------------------------------------------
 import os
 import sqlite3
-
-from concurrent.futures import ThreadPoolExecutor
-
+import pandas as pd
+import threading
 from db import init_db
 from parser.parser import HTMLParser, URLParser
 from logger.logger import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger()
 
 
-def process_url(url, db_path: str) -> None:
-    """각 URL을 파싱하고 HTML 데이터를 처리하는 함수"""
-    logger.info(f"Processing URL: {url}")
-
+def start_crawler_thread(thread_id, urls, db_path):
+    """각 스레드에서 URL을 처리하는 함수"""
+    logger.info(f"[Thread-{thread_id}] Processing URLs: {len(urls)}")
     html_parser = HTMLParser(db_path, logger=logger)
-    html_parser.parse_and_save_single_url(url)
+
+    for url in urls:
+        try:
+            logger.info(f"[Thread-{thread_id}] Processing URL: {url}")
+            html_parser.parse_and_save_single_url(url)
+            logger.info(f"[Thread-{thread_id}] Finished URL: {url}")
+        except Exception as e:
+            logger.error(f"[Thread-{thread_id}] Error processing URL {url}: {e}")
+
     html_parser.close()
+    logger.info(f"[Thread-{thread_id}] Finished processing all URLs.")
+
+
+def divide_indices(total_count, num_threads):
+    """인덱스를 스레드 개수에 따라 나누는 함수"""
+    avg = total_count // num_threads
+    indices = [range(i * avg, (i + 1) * avg) for i in range(num_threads)]
+    if total_count % num_threads != 0:
+        indices[-1] = range((num_threads - 1) * avg, total_count)
+    return indices
 
 
 def main():
-    """Parser 메인 동작 함수"""
-    # init sqlite3 db
     logger.info("Initializing database...")
     init_db.initialize_database()
 
-    # load env
     db_path = os.getenv("DB_PATH", "db/phishing_sites.db")
-    csv_path = os.getenv("CSV_PATH", "dataset/phishing_data.csv")
-    threads = int(os.getenv("THREADS", 8))  # 기본 스레드 개수는 8개로 고정(docker compose 동일)
+    csv_path = os.getenv(
+        "CSV_PATH", "dataset/한국인터넷진흥원_피싱사이트 URL_20221130.csv"
+    )
+    threads_num = int(os.getenv("THREADS", 8))
 
-    logger.info(f"Loading URLs from {csv_path}...")
-    url_parser = URLParser(csv_path, logger=logger)
+    logger.info(f"Loading dataset from {csv_path}...")
+    data = pd.read_csv(csv_path)
+    url_column = data.columns[1]
+    title_column = data.columns[0]
+
+    logger.info(f"Using URL column: {url_column}, Title column: {title_column}")
+    url_parser = URLParser(
+        csv_path=csv_path,
+        url_column=url_column,
+        title_column=title_column,
+        logger=logger,
+        db_path=db_path,
+    )
     url_parser.parse()
 
-    logger.info(f"Processing URLs with {threads} threads...")
+    logger.info("Fetching URLs from database...")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT url FROM phishing_data WHERE title IS NULL")
+    cursor.execute("SELECT url FROM phishing_data")
     urls = [row[0] for row in cursor.fetchall()]
     conn.close()
 
-    with ThreadPoolExecutor(max_workers=threads) as executor:
-        executor.map(lambda url: process_url(url, db_path), urls)
+    if not urls:
+        logger.info("No URLs to process.")
+        return
 
-    logger.info("All URLs processed successfully.")
+    # URL을 스레드 수에 맞게 나누기
+    url_indices = divide_indices(len(urls), threads_num)
+
+    threads = []
+    logger.info("Initializing threads...")
+    for idx, indices in enumerate(url_indices):
+        thread_urls = [urls[i] for i in indices]
+        thread = threading.Thread(
+            target=start_crawler_thread, args=(idx, thread_urls, db_path)
+        )
+        thread.start()
+        logger.info(f"Thread {idx} started.")
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
+
+    logger.info("All threads finished processing.")
 
 
 if __name__ == "__main__":

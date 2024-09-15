@@ -4,10 +4,12 @@
 # @author bnbong bbbong9@gmail.com
 #
 # 컬럼 이름	데이터 타입	설명
-# id	INTEGER	기본 키(PK), 자동 증가
-# url	TEXT	웹사이트 URL, 중복되지 않음
-# title	TEXT	URL에 해당하는 HTML 페이지의 제목
-# label	INTEGER	피싱 여부를 나타내는 필드 (1 = 피싱, 0 = 정상),
+# id	            INTEGER	기본 키(PK), 자동 증가
+# url	            TEXT	웹사이트 URL, 중복되지 않음
+# title	            TEXT	HTML 페이지 title
+# meta_description  TEXT    HTML 메타데이터
+# body_content      TEXT    HTML content 전문
+# label	            INTEGER	피싱 여부를 나타내는 필드 (1 = 피싱, 0 = 정상),
 #               추후 트랜스포머 모델이 피싱 사이트 판별 후 라벨 업데이트.
 # --------------------------------------------------------------------------
 import os
@@ -31,13 +33,14 @@ def create_connection(db_file) -> Connection:
 def create_table(conn) -> None:
     """phishing_data 테이블을 생성"""
     create_table_sql = """
-    CREATE TABLE IF NOT EXISTS phishing_data (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        url TEXT NOT NULL,
-        title TEXT,
-        label INTEGER DEFAULT 0
-    );
-    """
+        CREATE TABLE IF NOT EXISTS phishing_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            title TEXT,
+            meta_description TEXT,
+            body_content TEXT
+        );
+        """
     try:
         cursor = conn.cursor()
         cursor.execute(create_table_sql)
