@@ -49,9 +49,8 @@ def create_table(conn) -> None:
         print(f"Error creating table: {e}")
 
 
-def initialize_database() -> None:
+def initialize_database(db_path) -> None:
     """DB 초기화 함수, 테이블이 존재하지 않으면 생성"""
-    db_path = os.getenv("DB_PATH", "db/phishing_sites.db")
     conn = create_connection(db_path)
 
     if conn is not None:

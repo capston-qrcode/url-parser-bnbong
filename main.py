@@ -8,6 +8,9 @@ import os
 import sqlite3
 import pandas as pd
 import threading
+
+from datetime import datetime
+
 from db import init_db
 from parser.parser import HTMLParser, URLParser
 from logger.logger import get_logger
@@ -43,9 +46,10 @@ def divide_indices(total_count, num_threads):
 
 def main():
     logger.info("Initializing database...")
-    init_db.initialize_database()
+    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    db_path = f"db/phishing_sites_{current_time}.db"
+    init_db.initialize_database(db_path)
 
-    db_path = os.getenv("DB_PATH", "db/phishing_sites.db")
     csv_path = os.getenv(
         "CSV_PATH", "dataset/한국인터넷진흥원_피싱사이트 URL_20221130.csv"
     )

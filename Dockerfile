@@ -1,5 +1,5 @@
-LABEL authors="bnbong"
 FROM python:3.12.1-bookworm
+MAINTAINER bnbong "bbbong9@gmail.com"
 
 WORKDIR /app
 
@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y \
     unzip \
     xvfb \
     chromium-driver \
-    chromium-browser \
+    chromium
 
-RUN pip install poetry
+RUN pip install poetry webdriver-manager
 
 COPY pyproject.toml poetry.lock /app/
 

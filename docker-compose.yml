@@ -1,24 +1,18 @@
 version: '3'
 services:
   parser:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: phishing_parser
     volumes:
       - ./db:/app/db
+      - ./logging:/app/logging
     environment:
-      - DB_PATH=/app/db/phishing_sites.db
-      - CSV_PATH=/app/dataset/phishing_data.csv
+      - DB_PATH=/app/db/phishing_sites_${CURRENT_TIME}.db
+      - CSV_PATH=/app/dataset/한국인터넷진흥원_피싱사이트 URL_20221130.csv
       - THREADS=8
-    depends_on:
-      - db
-    networks:
-      - parser_network
-
-  db:
-    image: nouchka/sqlite3
-    container_name: sqlite_db
-    volumes:
-      - ./db:/db
+      - CURRENT_TIME=${CURRENT_TIME}
     networks:
       - parser_network
 
