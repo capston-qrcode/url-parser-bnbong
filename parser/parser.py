@@ -10,6 +10,8 @@ import pandas as pd
 
 from logging import Logger
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 
@@ -32,7 +34,8 @@ class HTMLParser:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
 
-        self.driver = webdriver.Chrome(options=chrome_options)
+        chromedriver_path = "/usr/bin/chromedriver"
+        self.driver = webdriver.Chrome(service=Service(chromedriver_path), options=chrome_options)
 
         self.__logger.info("[HTMLParser] Selenium WebDriver initialized.")
 

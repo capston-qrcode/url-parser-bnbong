@@ -3,15 +3,22 @@ MAINTAINER bnbong "bbbong9@gmail.com"
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+# for ARM64 chromium installation
+RUN apt-get update -y
+
+RUN apt-get install software-properties-common -y
+
+# RUN add-apt-repository ppa:xtradeb/apps -y
+
+RUN apt-get install -y \
     wget \
     curl \
     unzip \
     xvfb \
-    chromium-driver \
-    chromium
+    chromium \
+    chromium-driver 
 
-RUN pip install poetry webdriver-manager
+RUN pip install poetry
 
 COPY pyproject.toml poetry.lock /app/
 
