@@ -8,5 +8,8 @@ Selenium으로 구현한 파서입니다.
 - selenium
 - urllib3
 - poetry
-- pylint(예정)
 - black
+
+## Description
+
+Docker 기반 클라우드 환경 & MacOS M1 환경에서 구동하였습니다.

@@ -34,12 +34,11 @@ def create_table(conn) -> None:
     """phishing_data 테이블을 생성"""
     create_table_sql = """
         CREATE TABLE IF NOT EXISTS phishing_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT NOT NULL,
-            title TEXT,
-            meta_description TEXT,
-            body_content TEXT
-        );
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                html_content TEXT,
+                label TEXT
+            );
         """
     try:
         cursor = conn.cursor()
@@ -58,7 +57,3 @@ def initialize_database(db_path) -> None:
         conn.close()
     else:
         print("Error: Cannot establish a database connection.")
-
-
-if __name__ == "__main__":
-    initialize_database()
