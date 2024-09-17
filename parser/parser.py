@@ -1,3 +1,4 @@
+# TODO : DEBUG level log stamp 추가
 # --------------------------------------------------------------------------
 # URL, HTML Parser를 정의한 모듈입니다.
 #
@@ -9,11 +10,12 @@ import sqlite3
 import pandas as pd
 from pandas import DataFrame
 
-from logging import Logger
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
+
+from logging import Logger
 
 
 class HTMLParser:
@@ -54,12 +56,12 @@ class HTMLParser:
 
             self.__logger.info(f"[HTMLParser] Fetched HTML content for {url}")
 
-            self.save_data(url, html_content, label)
+            self._save_data(url, html_content, label)
             self.__logger.info(f"[HTMLParser] Data saved for URL: {url}")
         except Exception as e:
             self.__logger.error(f"[HTMLParser] Error processing URL {url}: {e}")
 
-    def save_data(self, url, html_content, label) -> None:
+    def _save_data(self, url, html_content, label) -> None:
         """파싱한 데이터를 SQLite3 데이터베이스에 저장"""
         cursor = self.conn.cursor()
         cursor.execute(

@@ -9,6 +9,7 @@ Selenium으로 구현한 파서입니다.
 - urllib3
 - poetry
 - black
+- pylint
 
 ## Description
 

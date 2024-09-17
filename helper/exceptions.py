@@ -3,4 +3,5 @@
 #
 # @author bnbong bbbong9@gmail.com
 # --------------------------------------------------------------------------
+# KeyError, ValueError -> selenium.common.exceptions.NoSuchDriverException
 pass

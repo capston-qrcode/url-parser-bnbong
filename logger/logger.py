@@ -5,8 +5,11 @@
 # --------------------------------------------------------------------------
 import os
 import logging
-from logging import Logger
+
 from datetime import datetime
+
+from logging import Logger
+
 
 LOG_DIR = "logging"
 
