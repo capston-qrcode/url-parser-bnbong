@@ -1,10 +1,10 @@
-# TODO : DEBUG level log stamp 추가
 # --------------------------------------------------------------------------
 # URL, HTML Parser를 정의한 모듈입니다.
 #
 # @author bnbong bbbong9@gmail.com
 # --------------------------------------------------------------------------
 import time
+import platform
 import sqlite3
 
 import pandas as pd
@@ -36,10 +36,13 @@ class HTMLParser:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
 
-        chromedriver_path = "/usr/bin/chromedriver"
-        self.driver = webdriver.Chrome(
-            service=Service(chromedriver_path), options=chrome_options
-        )
+        if platform.system() == "Darwin":  # MacOS M1 (local)
+            self.driver = webdriver.Chrome(options=chrome_options)
+        else:  # Ubuntu, Linux (cloud)
+            chromedriver_path = "/usr/bin/chromedriver"
+            self.driver = webdriver.Chrome(
+                service=Service(chromedriver_path), options=chrome_options
+            )
 
         self.__logger.info("[HTMLParser] Selenium WebDriver initialized.")
 
@@ -58,6 +61,7 @@ class HTMLParser:
 
             self._save_data(url, html_content, label)
             self.__logger.info(f"[HTMLParser] Data saved for URL: {url}")
+            self.__logger.debug(f"[HTMLParser] saved HTML content : {html_content}")
         except Exception as e:
             self.__logger.error(f"[HTMLParser] Error processing URL {url}: {e}")
 
@@ -112,11 +116,15 @@ class URLParser:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        print(self.data.columns)
-
         for index, row in self.data.iterrows():
             url = row[self.url_column]
             label = row[self.label_column] if self.label_column else "unknown"
+
+            if not label == "unknown" and label in ["benign", "Benign"]:
+                self.__logger.warning(
+                    f"Skipping row {index} via Benign URL."
+                )
+                continue
 
             if pd.isna(url) or pd.isna(label):
                 self.__logger.warning(

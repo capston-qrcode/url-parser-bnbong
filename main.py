@@ -1,4 +1,3 @@
-# TODO : type-safe, dataset 라벨 분기 로직 추가
 # --------------------------------------------------------------------------
 # Parser를 동작시키는 메인 모듈입니다.
 #
@@ -9,6 +8,7 @@
 # --------------------------------------------------------------------------
 import os
 import sqlite3
+from typing import List
 import pandas as pd
 import threading
 
@@ -21,7 +21,9 @@ from logger.logger import get_logger
 logger = get_logger()
 
 
-def start_crawler_thread(thread_id, urls, labels, db_path):
+def start_crawler_thread(
+    thread_id: int, urls: List[str], labels: List[str], db_path: str
+) -> None:
     """각 스레드에서 URL을 처리하는 함수"""
     logger.info(f"[Thread-{thread_id}] Processing URLs: {len(urls)}")
     html_parser = HTMLParser(db_path, logger=logger)
@@ -38,7 +40,7 @@ def start_crawler_thread(thread_id, urls, labels, db_path):
     logger.info(f"[Thread-{thread_id}] Finished processing all URLs.")
 
 
-def divide_indices(total_count, num_threads):
+def divide_indices(total_count: int, num_threads: int) -> List[range]:
     """인덱스를 스레드 개수에 따라 나누는 함수"""
     avg = total_count // num_threads
     indices = [range(i * avg, (i + 1) * avg) for i in range(num_threads)]
@@ -47,7 +49,7 @@ def divide_indices(total_count, num_threads):
     return indices
 
 
-def load_csv_and_store_urls(csv_path, db_path):
+def load_csv_and_store_urls(csv_path: str, db_path: str) -> None:
     """CSV 파일을 불러와 URL과 Label을 DB에 저장"""
     logger.info(f"Loading dataset from {csv_path}...")
     try:
@@ -94,7 +96,7 @@ def load_csv_and_store_urls(csv_path, db_path):
     url_parser.parse()
 
 
-def fetch_urls_from_db(db_path):
+def fetch_urls_from_db(db_path: str) -> List:
     """데이터베이스에서 아직 처리되지 않은 URL과 Label을 가져옴"""
     logger.info("Fetching URLs from database...")
     conn = sqlite3.connect(db_path)
@@ -105,7 +107,7 @@ def fetch_urls_from_db(db_path):
     return urls_labels
 
 
-def process_all_urls(db_path, threads_num):
+def process_all_urls(db_path: str, threads_num: int) -> None:
     """수집된 모든 URL에 대해 스레드를 사용해 HTML 파싱을 진행"""
     urls_labels = fetch_urls_from_db(db_path)
 
