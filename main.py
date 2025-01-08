@@ -22,17 +22,16 @@ logger = get_logger()
 
 
 def start_crawler_thread(
-    thread_id: int, urls: List[str], labels: List[str], db_path: str
+    thread_id: int, urls: List[str], labels: List[str], db_path: str,
+    progress_lock: threading.Lock, shared_count: dict
 ) -> None:
     """각 스레드에서 URL을 처리하는 함수"""
     logger.info(f"[Thread-{thread_id}] Processing URLs: {len(urls)}")
-    html_parser = HTMLParser(db_path, logger=logger)
+    html_parser = HTMLParser(db_path, logger=logger, progress_lock=progress_lock, shared_count=shared_count)
 
     for url, label in zip(urls, labels):
         try:
-            logger.info(f"[Thread-{thread_id}] Processing URL: {url}")
-            html_parser.parse_and_save_single_url(url, label)
-            logger.info(f"[Thread-{thread_id}] Finished URL: {url}")
+            html_parser.parse_and_save_single_url(url, label, thread_id)
         except Exception as e:
             logger.error(f"[Thread-{thread_id}] Error processing URL {url}: {e}")
 
@@ -53,9 +52,11 @@ def load_csv_and_store_urls(csv_path: str, db_path: str) -> None:
     """CSV 파일을 불러와 URL과 Label을 DB에 저장"""
     logger.info(f"Loading dataset from {csv_path}...")
     try:
-        data = pd.read_csv(csv_path, on_bad_lines="skip")
+        data = pd.read_csv(csv_path, on_bad_lines="skip", low_memory=False)
     except UnicodeDecodeError:
-        data = pd.read_csv(csv_path, encoding="ISO-8859-1", on_bad_lines="skip")
+        data = pd.read_csv(
+            csv_path, encoding="ISO-8859-1", on_bad_lines="skip", low_memory=False
+        )
 
     url_column = None
     label_column = None
@@ -116,8 +117,14 @@ def process_all_urls(db_path: str, threads_num: int) -> None:
         return
 
     urls, labels = zip(*urls_labels)
-
     url_indices = divide_indices(len(urls), threads_num)
+
+    # 스레드 간 공유할 진행 상황 카운터와 락
+    progress_lock = threading.Lock()
+    shared_count = {
+        'processed': 0,
+        'total': len(urls)
+    }
 
     threads = []
     logger.info("Initializing threads...")
@@ -125,7 +132,8 @@ def process_all_urls(db_path: str, threads_num: int) -> None:
         thread_urls = [urls[i] for i in indices]
         thread_labels = [labels[i] for i in indices]
         thread = threading.Thread(
-            target=start_crawler_thread, args=(idx, thread_urls, thread_labels, db_path)
+            target=start_crawler_thread,
+            args=(idx, thread_urls, thread_labels, db_path, progress_lock, shared_count)
         )
         thread.start()
         logger.info(f"Thread {idx} started.")

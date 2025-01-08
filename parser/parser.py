@@ -6,6 +6,7 @@
 import time
 import platform
 import sqlite3
+import threading
 
 import pandas as pd
 from pandas import DataFrame
@@ -25,12 +26,12 @@ class HTMLParser:
     :param logger: logger 객체
     """
 
-    def __init__(self, db_path: str, logger: Logger):
+    def __init__(self, db_path: str, logger: Logger, progress_lock: threading.Lock, shared_count: dict):
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
         self.__logger = logger
-        self.processed_count = 0
-        self.total_count = self._get_total_urls()
+        self.progress_lock = progress_lock
+        self.shared_count = shared_count
 
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # No GUI
@@ -54,10 +55,10 @@ class HTMLParser:
         cursor.execute("SELECT COUNT(*) FROM phishing_data WHERE html_content IS NULL")
         return cursor.fetchone()[0]
 
-    def parse_and_save_single_url(self, url, label) -> None:
+    def parse_and_save_single_url(self, url: str, label: str, thread_id: int) -> None:
         """단일 URL을 파싱하고 결과를 저장"""
         try:
-            self.__logger.info(f"[HTMLParser] Fetching URL: {url}")
+            self.__logger.info(f"[Thread-{thread_id}] Fetching URL: {url}")
             self.driver.get(url)
             time.sleep(2)
 
@@ -67,15 +68,16 @@ class HTMLParser:
             self.__logger.info(f"[HTMLParser] Fetched HTML content for {url}")
             self._save_data(url, html_content, label)
             
-            self.processed_count += 1
-            progress = (self.processed_count / self.total_count) * 100
-            self.__logger.info(
-                f"[HTMLParser] Progress: {self.processed_count}/{self.total_count} "
-                f"({progress:.2f}%) URLs processed"
-            )
+            with self.progress_lock:
+                self.shared_count['processed'] += 1
+                progress = (self.shared_count['processed'] / self.shared_count['total']) * 100
+                self.__logger.info(
+                    f"[Overall Progress] {self.shared_count['processed']}/{self.shared_count['total']} "
+                    f"({progress:.2f}%) URLs processed | Thread-{thread_id}"
+                )
             self.__logger.debug(f"[HTMLParser] saved HTML content : {html_content}")
         except Exception as e:
-            self.__logger.error(f"[HTMLParser] Error processing URL {url}: {e}")
+            self.__logger.error(f"[Thread-{thread_id}] Error processing URL {url}: {e}")
 
     def _save_data(self, url, html_content, label) -> None:
         """파싱한 데이터를 SQLite3 데이터베이스에 저장"""
@@ -133,32 +135,49 @@ class URLParser:
         cursor = conn.cursor()
 
         for index, row in self.data.iterrows():
-            url = row[self.url_column]
-            label = row[self.label_column] if self.label_column else "unknown"
+            try:
+                url = row[self.url_column]
+                label = row[self.label_column] if self.label_column else "unknown"
 
-            # URL이나 라벨이 없는 경우 건너뛰기
-            if pd.isna(url) or pd.isna(label):
-                self.__logger.warning(
-                    f"Skipping row {index} due to missing URL or label."
+                # URL이나 라벨이 없는 경우 건너뛰기
+                if pd.isna(url) or pd.isna(label):
+                    self.__logger.warning(
+                        f"Skipping row {index} due to missing URL or label."
+                    )
+                    continue
+
+                # 라벨 타입 처리
+                if isinstance(label, (float, int)):
+                    label_str = str(int(label))
+                else:
+                    label_str = str(label).lower()
+
+                # 라벨에 따른 카운터 증가
+                if label_str in ["benign", "0"]:
+                    self.benign_count += 1
+                    normalized_label = "benign"
+                elif label_str in ["phishing", "1"]:
+                    self.phishing_count += 1
+                    normalized_label = "phishing"
+                else:
+                    self.unknown_count += 1
+                    normalized_label = "unknown"
+
+                # URL 형식 보정
+                if not str(url).startswith("http://") and not str(url).startswith("https://"):
+                    url = "http://" + str(url)
+
+                cursor.execute(
+                    "INSERT INTO phishing_data (url, label) VALUES (?, ?)",
+                    (url, normalized_label),
                 )
+                self.__logger.info(
+                    f"[URLParser] URL inserted: {url}, Original Label: {label}, Normalized Label: {normalized_label}"
+                )
+
+            except Exception as e:
+                self.__logger.error(f"Error processing row {index}: {str(e)}")
                 continue
-
-            # 라벨에 따른 카운터 증가
-            if label.lower() in ["benign", "0"]:
-                self.benign_count += 1
-            elif label.lower() in ["phishing", "1"]:
-                self.phishing_count += 1
-            else:
-                self.unknown_count += 1
-
-            # URL 형식 보정
-            if not url.startswith("http://") and not url.startswith("https://"):
-                url = "http://" + url
-
-            cursor.execute(
-                "INSERT INTO phishing_data (url, label) VALUES (?, ?)", (url, label)
-            )
-            self.__logger.info(f"[URLParser] URL inserted: {url}, Label: {label}")
 
         conn.commit()
         conn.close()

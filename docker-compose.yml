@@ -8,9 +8,9 @@ services:
     volumes:
       - ./db:/app/db
       - ./logging:/app/logging
+      - ./dataset:/app/dataset
     environment:
       - DB_PATH=/app/db/phishing_sites_${CURRENT_TIME}.db
-      - CSV_PATH=/app/dataset/한국인터넷진흥원_피싱사이트 URL_20221130.csv
       - THREADS=8
       - CURRENT_TIME=${CURRENT_TIME}
     networks:
