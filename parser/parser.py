@@ -29,6 +29,8 @@ class HTMLParser:
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
         self.__logger = logger
+        self.processed_count = 0
+        self.total_count = self._get_total_urls()
 
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # No GUI
@@ -46,6 +48,12 @@ class HTMLParser:
 
         self.__logger.info("[HTMLParser] Selenium WebDriver initialized.")
 
+    def _get_total_urls(self) -> int:
+        """전체 URL 개수를 가져오는 메서드"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM phishing_data WHERE html_content IS NULL")
+        return cursor.fetchone()[0]
+
     def parse_and_save_single_url(self, url, label) -> None:
         """단일 URL을 파싱하고 결과를 저장"""
         try:
@@ -54,13 +62,17 @@ class HTMLParser:
             time.sleep(2)
 
             soup = BeautifulSoup(self.driver.page_source, "html.parser")
-
             html_content = str(soup)
 
             self.__logger.info(f"[HTMLParser] Fetched HTML content for {url}")
-
             self._save_data(url, html_content, label)
-            self.__logger.info(f"[HTMLParser] Data saved for URL: {url}")
+            
+            self.processed_count += 1
+            progress = (self.processed_count / self.total_count) * 100
+            self.__logger.info(
+                f"[HTMLParser] Progress: {self.processed_count}/{self.total_count} "
+                f"({progress:.2f}%) URLs processed"
+            )
             self.__logger.debug(f"[HTMLParser] saved HTML content : {html_content}")
         except Exception as e:
             self.__logger.error(f"[HTMLParser] Error processing URL {url}: {e}")
@@ -110,6 +122,10 @@ class URLParser:
         self.label_column = label_column
         self.data = data
         self.__logger = logger
+        # URL 카운터 추가
+        self.benign_count = 0
+        self.phishing_count = 0
+        self.unknown_count = 0
 
     def parse(self) -> None:
         """CSV 파일에서 URL과 Label을 읽어 SQLite3 데이터베이스에 저장"""
@@ -120,17 +136,20 @@ class URLParser:
             url = row[self.url_column]
             label = row[self.label_column] if self.label_column else "unknown"
 
-            if not label == "unknown" and label in ["benign", "Benign"]:
-                self.__logger.warning(
-                    f"Skipping row {index} via Benign URL."
-                )
-                continue
-
+            # URL이나 라벨이 없는 경우 건너뛰기
             if pd.isna(url) or pd.isna(label):
                 self.__logger.warning(
                     f"Skipping row {index} due to missing URL or label."
                 )
                 continue
+
+            # 라벨에 따른 카운터 증가
+            if label.lower() in ["benign", "0"]:
+                self.benign_count += 1
+            elif label.lower() in ["phishing", "1"]:
+                self.phishing_count += 1
+            else:
+                self.unknown_count += 1
 
             # URL 형식 보정
             if not url.startswith("http://") and not url.startswith("https://"):
@@ -143,4 +162,13 @@ class URLParser:
 
         conn.commit()
         conn.close()
+
+        # 최종 카운트 로그 출력
+        self.__logger.info(
+            f"[URLParser] URL Count Summary:\n"
+            f"- Benign URLs: {self.benign_count}\n"
+            f"- Phishing URLs: {self.phishing_count}\n"
+            f"- Unknown URLs: {self.unknown_count}\n"
+            f"- Total URLs: {self.benign_count + self.phishing_count + self.unknown_count}"
+        )
         self.__logger.info(f"[URLParser] All URLs inserted into database.")

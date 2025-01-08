@@ -144,10 +144,11 @@ def main():
     init_db.initialize_database(db_path)
 
     csv_files = [
-        "dataset/balanced_urls.csv",
-        "dataset/phishing_and_benign_websites.csv",
-        "dataset/urlset.csv",
-        "dataset/한국인터넷진흥원_피싱사이트 URL_20221130.csv",
+        # "dataset/balanced_urls.csv",
+        # "dataset/phishing_and_benign_websites.csv",
+        # "dataset/urlset.csv",
+        # "dataset/한국인터넷진흥원_피싱사이트 URL_20221130.csv",
+        "dataset/test.csv",
     ]
 
     for csv_file in csv_files:
